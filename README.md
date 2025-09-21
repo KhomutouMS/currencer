@@ -7,7 +7,7 @@
 Язык: C++.  
 Интерфейс: Windows API.
 
-[SRS of program]() 
+[SRS of program](Documentation/Requirements/SRS.md) 
 
 [User interface images]()
 
