@@ -7,9 +7,9 @@
 Язык: C++.  
 Интерфейс: Windows API.
 
-[SRS of program](Documentation/Requirements/SRS.md) 
+[SRS программы](Documentation/Requirements/SRS.md) 
 
-[User interface images](Documentation/Mockups)
+[Изображения пользовательского интерфейса](Documentation/Mockups)
 
 Диаграммы
 
