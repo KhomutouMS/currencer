@@ -9,7 +9,7 @@
 
 [SRS of program](Documentation/Requirements/SRS.md) 
 
-[User interface images]()
+[User interface images](Documentation/Mockups)
 
 Диаграммы
 
