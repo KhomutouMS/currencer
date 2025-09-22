@@ -19,8 +19,8 @@ Windows API код
 Используемые шаблоны:  
 в разработке
 
-[План тестирования]([Test plan.md](https://github.com/KhomutouMS/currencer/blob/master/Test%20plan.md))
+[План тестирования](https://github.com/KhomutouMS/currencer/blob/master/Test%20plan.md)
 
-[Результаты тестирования]([Test results.md](https://github.com/KhomutouMS/currencer/blob/master/Test%20results.md))
+[Результаты тестирования](https://github.com/KhomutouMS/currencer/blob/master/Test%20results.md)
 
 _Хомутов Максим 350503_
