@@ -1,79 +1,6 @@
-Отлично! На основе вашего SRS я создам диаграмму вариантов использования и глоссарий для приложения "Currencer". Вот результат:
-
 # Диаграмма вариантов использования Currencer
 
-```mermaid
-flowchart TD
-    %% Actors
-    Guest[Гость<br/>Неавторизованный пользователь]
-    User[Зарегистрированный<br/>пользователь]
-    Admin[Администратор]
-    ExternalAPI[Внешние API<br/>валютных данных]
-    
-    %% Use Cases
-    subgraph Аутентификация
-        Register[Зарегистрироваться]
-        Login[Войти в систему]
-        Logout[Выйти из системы]
-    end
-    
-    subgraph Основные функции
-        ViewRates[Просмотр курсов валют]
-        AddFavorite[Добавить валютную пару<br/>в избранное]
-        RemoveFavorite[Удалить из избранного]
-        ConvertCurrency[Конвертировать валюту]
-        SimulateExchange[Симуляция обмена валют]
-        ViewHistory[Просмотр истории<br/>операций]
-        GenerateReport[Генерация отчетов]
-    end
-    
-    subgraph Уведомления
-        SetNotification[Настройка уведомлений]
-        ReceiveNotification[Получение уведомлений]
-    end
-    
-    subgraph Администрирование
-        ManageUsers[Управление пользователями]
-        SystemMonitoring[Мониторинг системы]
-    end
-    
-    %% Relationships
-    %% Association
-    Guest --- Register
-    Guest --- Login
-    Guest --- ViewRates
-    
-    User --- Login
-    User --- Logout
-    User --- ViewRates
-    User --- AddFavorite
-    User --- RemoveFavorite
-    User --- ConvertCurrency
-    User --- SimulateExchange
-    User --- ViewHistory
-    User --- GenerateReport
-    User --- SetNotification
-    User --- ReceiveNotification
-    
-    Admin --- ManageUsers
-    Admin --- SystemMonitoring
-    
-    ExternalAPI --- ViewRates
-    ExternalAPI --- ConvertCurrency
-    ExternalAPI --- SimulateExchange
-    
-    %% Include relationships
-    AddFavorite -.->|include| ViewRates
-    RemoveFavorite -.->|include| ViewRates
-    ConvertCurrency -.->|include| ViewRates
-    SimulateExchange -.->|include| ViewRates
-    SimulateExchange -.->|include| ConvertCurrency
-    GenerateReport -.->|include| ViewHistory
-    
-    %% Extend relationships
-    ReceiveNotification -.->|extend| AddFavorite
-    ReceiveNotification -.->|extend| ViewRates
-```
+(https://github.com/KhomutouMS/currencer/blob/master/Documentation/Diagrams/Images/UseCase.png)
 
 # Глоссарий
 
@@ -82,7 +9,6 @@ flowchart TD
 | **Пользователь** | Человек, использующий приложение Currencer |
 | **Гость** | Пользователь, использующий приложение без авторизации |
 | **Зарегистрированный пользователь** | Пользователь, прошедший регистрацию и авторизацию в приложении |
-| **Администратор** | Пользователь с правами управления системой и пользователями |
 | **Валютная пара** | Пара валют, например EUR/USD, где первая валюта - базовая, вторая - котируемая |
 | **Избранное** | Список валютных пар, отслеживаемых пользователем |
 | **Курс валюты** | Отношение стоимости одной валюты к другой |
