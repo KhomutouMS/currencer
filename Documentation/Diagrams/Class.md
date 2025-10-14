@@ -1,19 +1,14 @@
-# Диаграммы активностей    
+# Диаграмма классов 
 
 # Содержание
-1. [Вход в учётную запись](#1)
-2. [Регистрация в приложении](#2)
-3. [Добавление фильма](#3)
+1. [Диаграмма классов](#1)
+2. [Глоссарий](#2)
 
 
-### 1. Вход в учётную запись<a name="1"></a>
+### 1. Диаграмма классов<a name="1"></a>
 
-![Вход в учётную запись](https://github.com/DanutaGagua/Personal-film-collection-manager/blob/master/Diagrams/Images/ActivityDiagramSignIn_.png)
+![Диаграмма классов](https://github.com/KhomutouMS/currencer/blob/master/Documentation/Diagrams/Images/ClassDiagram.png)
 
-### 2. Регистрация в приложении<a name="2"></a>
+### 2. Глоссарий<a name="2"></a>
 
-![Регистрация в приложении](https://github.com/DanutaGagua/Personal-film-collection-manager/blob/master/Diagrams/Images/ActivityDiagramSignUp.png)
-  
-### 3. Добавление фильма<a name="3"></a>
-
-![Добавление фильма](https://github.com/DanutaGagua/Personal-film-collection-manager/blob/master/Diagrams/Images/ActivityDiagramAddFilm.png)
+![Глоссарий](https://github.com/KhomutouMS/currencer/blob/master/Documentation/Diagrams/Images/Glossarium.png)
