@@ -14,6 +14,6 @@
 
 ![Создание валютной пары](https://github.com/KhomutouMS/currencer/blob/master/Documentation/Diagrams/Images/State2.png)
   
-### 3. Взаимодействие с кошельками="3"></a>
+### 3. Взаимодействие с кошельками<a name="3"></a>
 
 ![Взаимодействие с кошельками](https://github.com/KhomutouMS/currencer/blob/master/Documentation/Diagrams/Images/State3.png)
