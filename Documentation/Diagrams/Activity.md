@@ -2,18 +2,18 @@
 
 # Содержание
 1. [Вход в учётную запись](#1)
-2. [Регистрация в приложении](#2)
-3. [Добавление фильма](#3)
+2. [Создание валютной пары](#2)
+3. [Взаимодействие с кошельками](#3)
 
 
 ### 1. Вход в учётную запись<a name="1"></a>
 
-![Вход в учётную запись](https://github.com/DanutaGagua/Personal-film-collection-manager/blob/master/Diagrams/Images/ActivityDiagramSignIn_.png)
+![Вход в учётную запись](https://github.com/KhomutouMS/currencer/edit/master/Documentation/Diagrams/Images/Activity1.png)
 
-### 2. Регистрация в приложении<a name="2"></a>
+### 2. Создание валютной пары<a name="2"></a>
 
-![Регистрация в приложении](https://github.com/DanutaGagua/Personal-film-collection-manager/blob/master/Diagrams/Images/ActivityDiagramSignUp.png)
+![Создание валютной пары](https://github.com/KhomutouMS/currencer/edit/master/Documentation/Diagrams/Images/Activity2.png)
   
-### 3. Добавление фильма<a name="3"></a>
+### 3. Взаимодействие с кошельками="3"></a>
 
-![Добавление фильма](https://github.com/DanutaGagua/Personal-film-collection-manager/blob/master/Diagrams/Images/ActivityDiagramAddFilm.png)
+![Взаимодействие с кошельками](https://github.com/KhomutouMS/currencer/edit/master/Documentation/Diagrams/Images/Activity3.png)
