@@ -1,6 +1,6 @@
 # Диаграмма вариантов использования Currencer
 
-(https://github.com/KhomutouMS/currencer/blob/master/Documentation/Diagrams/Images/UseCase.png)
+![](https://github.com/KhomutouMS/currencer/blob/master/Documentation/Diagrams/Images/UseCAse.png)
 
 # Глоссарий
 
