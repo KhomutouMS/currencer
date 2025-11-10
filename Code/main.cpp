@@ -1255,7 +1255,7 @@ LRESULT CALLBACK ReportsWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
             WS_VISIBLE | WS_CHILD,
             50, 250, 150, 20, hWnd, NULL, NULL, NULL);
 
-        hStartDateEdit = CreateWindow(L"EDIT", L"2024-01-01",
+        hStartDateEdit = CreateWindow(L"EDIT", L"2025-01-01",
             WS_VISIBLE | WS_CHILD | WS_BORDER | ES_AUTOHSCROLL,
             210, 250, 120, 20, hWnd, NULL, NULL, NULL);
 
@@ -1263,7 +1263,7 @@ LRESULT CALLBACK ReportsWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
             WS_VISIBLE | WS_CHILD,
             50, 280, 150, 20, hWnd, NULL, NULL, NULL);
 
-        hEndDateEdit = CreateWindow(L"EDIT", L"2024-12-31",
+        hEndDateEdit = CreateWindow(L"EDIT", L"2025-12-31",
             WS_VISIBLE | WS_CHILD | WS_BORDER | ES_AUTOHSCROLL,
             210, 280, 120, 20, hWnd, NULL, NULL, NULL);
 
@@ -2480,7 +2480,7 @@ LRESULT CALLBACK MainMenuWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
                 L"CurrencyPairsClass",
                 L"Управление валютными парами",
                 WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-                CW_USEDEFAULT, CW_USEDEFAULT, 400, 300,
+                CW_USEDEFAULT, CW_USEDEFAULT, 400, 500,
                 hWnd, NULL, g_hInstance, NULL
             );
             ShowWindow(hPairsWindow, SW_SHOW);
@@ -2563,7 +2563,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         !RegisterWindowClass(L"NotificationsWindowClass", NotificationsWindowProc) ||
         !RegisterWindowClass(L"WalletsWindowClass", WalletsWindowProc) ||
         !RegisterWindowClass(L"WalletDetailWindowClass", WalletDetailWindowProc) ||
-        !RegisterWindowClass(L"ReportViewWindowClass", ReportViewWindowProc)
+        !RegisterWindowClass(L"ReportViewWindowClass", ReportViewWindowProc) ||
+        !RegisterWindowClass(L"ReportsWindowClass", ReportsWindowProc)
         ) {
         MessageBox(NULL, L"Ошибка регистрации классов окон", L"Ошибка", MB_ICONERROR);
         return 0;
