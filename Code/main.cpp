@@ -24,6 +24,14 @@ struct Wallet {
     std::vector<WalletCurrency> currencies;
 };
 
+// Функция для расчета статистики по отчету
+struct ReportStats {
+    double totalSold = 0.0;
+    double totalBought = 0.0;
+    int transactionCount = 0;
+    std::map<std::wstring, double> currencyChanges;
+};
+
 // Глобальные переменные
 HINSTANCE g_hInstance;
 std::wstring g_currentUser;
@@ -61,6 +69,20 @@ std::vector<std::wstring> supportedCurrencies = {
 std::vector<Notification> g_notifications;
 bool g_notificationThreadRunning = false;
 
+// Структура для транзакции
+struct Transaction {
+    std::wstring date;
+    std::wstring soldCurrency;
+    double soldAmount;
+    std::wstring boughtCurrency;
+    double boughtAmount;
+    double exchangeRate;
+    std::vector<WalletCurrency> walletState; // Состояние кошелька после транзакции
+};
+
+// Глобальные переменные
+int g_currentWalletIndex = -1; // Индекс открытого кошелька
+
 // Функции для работы с валютными парами
 std::wstring GetUserCurrencyFile() {
     if (g_currentUser == L"Гость") return L"";
@@ -69,6 +91,311 @@ std::wstring GetUserCurrencyFile() {
     return std::wstring(userStr.begin(), userStr.end()) + L"_pairs.txt";
 }
 
+// Структура для передачи данных в окно отчета
+struct ReportData {
+    Wallet wallet;
+    std::vector<Transaction> transactions;
+    std::wstring startDate;
+    std::wstring endDate;
+};
+
+// Функция для расчета статистики по отчету
+ReportStats CalculateReportStats(const std::vector<Transaction>& transactions) {
+    ReportStats stats;
+    stats.transactionCount = static_cast<int>(transactions.size());
+
+    for (const auto& transaction : transactions) {
+        stats.totalSold += transaction.soldAmount;
+        stats.totalBought += transaction.boughtAmount;
+
+        // Считаем изменения по валютам
+        stats.currencyChanges[transaction.soldCurrency] -= transaction.soldAmount;
+        stats.currencyChanges[transaction.boughtCurrency] += transaction.boughtAmount;
+    }
+
+    return stats;
+}
+
+// Функция создания окна отчета
+void CreateReportWindow(HWND parent, const Wallet& wallet,
+    const std::vector<Transaction>& transactions,
+    const std::wstring& startDate, const std::wstring& endDate) {
+    // Создаем данные для отчета
+    ReportData* reportData = new ReportData;
+    reportData->wallet = wallet;
+    reportData->transactions = transactions;
+    reportData->startDate = startDate;
+    reportData->endDate = endDate;
+
+    // Создаем окно отчета
+    HWND hReportWindow = CreateWindow(
+        L"ReportViewWindowClass",
+        L"Отчет по кошельку",
+        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+        CW_USEDEFAULT, CW_USEDEFAULT, 600, 600,
+        parent, NULL, g_hInstance, reportData
+    );
+
+    if (hReportWindow) {
+        ShowWindow(hReportWindow, SW_SHOW);
+        UpdateWindow(hReportWindow);
+    }
+    else {
+        delete reportData; // Если окно не создалось, очищаем память
+    }
+}
+
+// Функция заполнения содержимого отчета
+void FillReportContent(HWND hListBox, const ReportData& reportData) {
+    if (!hListBox) return;
+
+    SendMessage(hListBox, LB_RESETCONTENT, 0, 0);
+
+    // Статистика
+    ReportStats stats = CalculateReportStats(reportData.transactions);
+
+    // Заголовок
+    SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)L"════════════════ ОТЧЕТ ════════════════");
+
+    // Общая информация
+    std::wstring periodInfo = L"Период: " + reportData.startDate + L" - " + reportData.endDate;
+    SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)periodInfo.c_str());
+
+    std::wstring walletInfo = L"Кошелек: " + reportData.wallet.name;
+    SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)walletInfo.c_str());
+
+    std::wstring countInfo = L"Количество транзакций: " + std::to_wstring(stats.transactionCount);
+    SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)countInfo.c_str());
+
+    SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)L"");
+    SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)L"════════════ СТАТИСТИКА ════════════");
+
+    // Статистика
+    std::wstring soldInfo = L"Всего продано: " + std::to_wstring(stats.totalSold);
+    SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)soldInfo.c_str());
+
+    std::wstring boughtInfo = L"Всего куплено: " + std::to_wstring(stats.totalBought);
+    SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)boughtInfo.c_str());
+
+    // Изменения по валютам
+    SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)L"");
+    SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)L"════════ ИЗМЕНЕНИЯ ПО ВАЛЮТАМ ════════");
+
+    for (const auto& currencyChange : stats.currencyChanges) {
+        if (currencyChange.second != 0) {
+            std::wstring changeInfo = currencyChange.first + L": " +
+                (currencyChange.second > 0 ? L"+" : L"") +
+                std::to_wstring(currencyChange.second);
+            SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)changeInfo.c_str());
+        }
+    }
+
+    // Детали транзакций
+    SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)L"");
+    SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)L"═══════════ ТРАНЗАКЦИИ ═══════════");
+
+    for (const auto& transaction : reportData.transactions) {
+        std::wstring transactionInfo = transaction.date + L": " +
+            std::to_wstring(transaction.soldAmount) + L" " +
+            transaction.soldCurrency + L" → " +
+            std::to_wstring(transaction.boughtAmount) + L" " +
+            transaction.boughtCurrency +
+            L" (курс: " + std::to_wstring(transaction.exchangeRate) + L")";
+        SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)transactionInfo.c_str());
+    }
+}
+
+// Функция обновления списка кошельков в окне отчетов
+void UpdateReportsWalletsList(HWND hListBox) {
+    if (!hListBox) return;
+
+    SendMessage(hListBox, LB_RESETCONTENT, 0, 0);
+
+    if (g_wallets.empty()) {
+        SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)L"Нет кошельков");
+        return;
+    }
+
+    for (size_t i = 0; i < g_wallets.size(); i++) {
+        const auto& wallet = g_wallets[i];
+        std::wstring displayText = wallet.name + L" (" +
+            std::to_wstring(wallet.currencies.size()) +
+            L" валют)";
+        SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)displayText.c_str());
+    }
+}
+
+// Функции для работы с отчетами
+std::vector<Transaction> LoadTransactions(const Wallet& wallet) {
+    std::vector<Transaction> transactions;
+
+    if (g_currentUser == L"Гость") return transactions;
+
+    std::wstring filename = GetUserCurrencyFile() + L"_" + wallet.name + L"_transactions.txt";
+    std::wifstream file(filename);
+    if (!file.is_open()) return transactions;
+
+    file.imbue(std::locale(""));
+
+    std::wstring line;
+    Transaction currentTransaction;
+    bool readingTransaction = false;
+    bool readingWalletState = false;
+
+    while (std::getline(file, line)) {
+        if (line.find(L"DATE:") == 0) {
+            if (readingTransaction) {
+                transactions.push_back(currentTransaction);
+            }
+            currentTransaction = Transaction();
+            currentTransaction.date = line.substr(5); // "DATE:".length()
+            readingTransaction = true;
+        }
+        else if (line.find(L"SOLD:") == 0) {
+            size_t colonPos = line.find(L':', 5);
+            if (colonPos != std::wstring::npos) {
+                currentTransaction.soldCurrency = line.substr(5, colonPos - 5);
+                std::wstring amountStr = line.substr(colonPos + 1);
+                try {
+                    currentTransaction.soldAmount = std::stod(amountStr);
+                }
+                catch (...) {}
+            }
+        }
+        else if (line.find(L"BOUGHT:") == 0) {
+            size_t colonPos = line.find(L':', 7);
+            if (colonPos != std::wstring::npos) {
+                currentTransaction.boughtCurrency = line.substr(7, colonPos - 7);
+                std::wstring amountStr = line.substr(colonPos + 1);
+                try {
+                    currentTransaction.boughtAmount = std::stod(amountStr);
+                }
+                catch (...) {}
+            }
+        }
+        else if (line.find(L"RATE:") == 0) {
+            std::wstring rateStr = line.substr(5);
+            try {
+                currentTransaction.exchangeRate = std::stod(rateStr);
+            }
+            catch (...) {}
+        }
+        else if (line.find(L"WALLET_STATE:") == 0) {
+            readingWalletState = true;
+            currentTransaction.walletState.clear();
+        }
+        else if (readingWalletState && !line.empty()) {
+            // Парсим состояние кошелька
+            size_t start = 0;
+            size_t end = line.find(L';');
+            while (end != std::wstring::npos) {
+                std::wstring currencyState = line.substr(start, end - start);
+                size_t colonPos = currencyState.find(L':');
+                if (colonPos != std::wstring::npos) {
+                    WalletCurrency wc;
+                    wc.currency = currencyState.substr(0, colonPos);
+                    try {
+                        wc.amount = std::stod(currencyState.substr(colonPos + 1));
+                        currentTransaction.walletState.push_back(wc);
+                    }
+                    catch (...) {}
+                }
+                start = end + 1;
+                end = line.find(L';', start);
+            }
+            readingWalletState = false;
+        }
+        else if (line == L"ENDTRANSACTION") {
+            if (readingTransaction) {
+                transactions.push_back(currentTransaction);
+            }
+            readingTransaction = false;
+        }
+    }
+
+    // Добавляем последнюю транзакцию если есть
+    if (readingTransaction) {
+        transactions.push_back(currentTransaction);
+    }
+
+    file.close();
+    return transactions;
+}
+
+// Функция для фильтрации транзакций по дате
+std::vector<Transaction> FilterTransactionsByDate(const std::vector<Transaction>& transactions,
+    const std::wstring& startDate,
+    const std::wstring& endDate) {
+    std::vector<Transaction> filtered;
+
+    for (const auto& transaction : transactions) {
+        // Простая проверка - если дата транзакции между startDate и endDate
+        if (transaction.date >= startDate && transaction.date <= endDate) {
+            filtered.push_back(transaction);
+        }
+    }
+
+    return filtered;
+}
+
+
+// Функция обновления содержимого кошелька в списке
+void UpdateWalletContentList(HWND hListBox, const Wallet& wallet) {
+    if (!hListBox) return;
+
+    SendMessage(hListBox, LB_RESETCONTENT, 0, 0);
+
+    if (wallet.currencies.empty()) {
+        SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)L"Кошелек пуст");
+        return;
+    }
+
+    for (const auto& currency : wallet.currencies) {
+        std::wstring displayText = currency.currency + L": " +
+            std::to_wstring(currency.amount);
+        SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)displayText.c_str());
+    }
+}
+
+// Функции для работы с транзакциями
+void SaveTransaction(const Wallet& wallet, const Transaction& transaction) {
+    if (g_currentUser == L"Гость") return;
+
+    std::wstring filename = GetUserCurrencyFile() + L"_" + wallet.name + L"_transactions.txt";
+    std::wofstream file(filename, std::ios::app);
+    if (!file.is_open()) return;
+
+    file.imbue(std::locale(""));
+
+    file << L"DATE:" << transaction.date << std::endl;
+    file << L"SOLD:" << transaction.soldCurrency << L":" << transaction.soldAmount << std::endl;
+    file << L"BOUGHT:" << transaction.boughtCurrency << L":" << transaction.boughtAmount << std::endl;
+    file << L"RATE:" << transaction.exchangeRate << std::endl;
+    file << L"WALLET_STATE:" << std::endl;
+
+    for (const auto& currency : transaction.walletState) {
+        file << currency.currency << L":" << currency.amount << L";";
+    }
+    file << std::endl;
+    file << L"ENDTRANSACTION" << std::endl;
+
+    file.close();
+}
+
+std::wstring GetCurrentDateTime() {
+    time_t now = time(0);
+    struct tm timeinfo;
+    localtime_s(&timeinfo, &now);
+
+    wchar_t buffer[80];
+    wcsftime(buffer, sizeof(buffer), L"%Y-%m-%d %H:%M:%S", &timeinfo);
+    return std::wstring(buffer);
+}
+
+// Функция для получения состояния кошелька (копии)
+std::vector<WalletCurrency> GetWalletState(const Wallet& wallet) {
+    return wallet.currencies;
+}
 // Функция обновления списка кошельков
 void UpdateWalletsList(HWND hListBox) {
     if (!hListBox) return;
@@ -896,6 +1223,226 @@ BOOL RegisterWindowClass(LPCWSTR className, WNDPROC windowProc) {
     return RegisterClass(&wc);
 }
 
+// Оконная процедура окна ОТЧЕТОВ
+LRESULT CALLBACK ReportsWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    static HWND hWalletsList = NULL;
+    static HWND hStartDateEdit = NULL;
+    static HWND hEndDateEdit = NULL;
+    static HWND hStatusLabel = NULL;
+
+    switch (uMsg) {
+    case WM_CREATE:
+    {
+        CreateWindow(L"STATIC", L"Создание отчета:",
+            WS_VISIBLE | WS_CHILD | SS_CENTER,
+            50, 20, 300, 30, hWnd, NULL, NULL, NULL);
+
+        // Список кошельков
+        CreateWindow(L"STATIC", L"Выберите кошелек:",
+            WS_VISIBLE | WS_CHILD,
+            50, 60, 150, 20, hWnd, NULL, NULL, NULL);
+
+        hWalletsList = CreateWindow(L"LISTBOX", L"",
+            WS_VISIBLE | WS_CHILD | WS_BORDER | LBS_NOTIFY | WS_VSCROLL,
+            50, 85, 300, 120, hWnd, (HMENU)700, NULL, NULL);
+
+        // Поля для дат
+        CreateWindow(L"STATIC", L"Период отчета:",
+            WS_VISIBLE | WS_CHILD,
+            50, 220, 150, 20, hWnd, NULL, NULL, NULL);
+
+        CreateWindow(L"STATIC", L"С даты (гггг-мм-дд):",
+            WS_VISIBLE | WS_CHILD,
+            50, 250, 150, 20, hWnd, NULL, NULL, NULL);
+
+        hStartDateEdit = CreateWindow(L"EDIT", L"2024-01-01",
+            WS_VISIBLE | WS_CHILD | WS_BORDER | ES_AUTOHSCROLL,
+            210, 250, 120, 20, hWnd, NULL, NULL, NULL);
+
+        CreateWindow(L"STATIC", L"По дату (гггг-мм-дд):",
+            WS_VISIBLE | WS_CHILD,
+            50, 280, 150, 20, hWnd, NULL, NULL, NULL);
+
+        hEndDateEdit = CreateWindow(L"EDIT", L"2024-12-31",
+            WS_VISIBLE | WS_CHILD | WS_BORDER | ES_AUTOHSCROLL,
+            210, 280, 120, 20, hWnd, NULL, NULL, NULL);
+
+        // Кнопки
+        CreateWindow(L"BUTTON", L"Назад",
+            WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+            50, 320, 100, 30, hWnd,
+            (HMENU)701, NULL, NULL);
+
+        CreateWindow(L"BUTTON", L"Создать отчет",
+            WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+            160, 320, 120, 30, hWnd,
+            (HMENU)702, NULL, NULL);
+
+        hStatusLabel = CreateWindow(L"STATIC", L"Выберите кошелек и период для отчета",
+            WS_VISIBLE | WS_CHILD | SS_CENTER,
+            50, 370, 300, 20, hWnd, NULL, NULL, NULL);
+
+        // Заполняем список кошельков
+        UpdateReportsWalletsList(hWalletsList);
+
+        HFONT hFont = CreateFont(12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft Sans Serif");
+        if (hFont) {
+            HWND hChild = GetWindow(hWnd, GW_CHILD);
+            while (hChild) {
+                SendMessage(hChild, WM_SETFONT, (WPARAM)hFont, TRUE);
+                hChild = GetNextWindow(hChild, GW_HWNDNEXT);
+            }
+        }
+    }
+    break;
+
+    case WM_COMMAND:
+    {
+        int buttonId = LOWORD(wParam);
+
+        switch (buttonId) {
+        case 701: // Назад
+            DestroyWindow(hWnd);
+            break;
+
+        case 702: // Создать отчет
+        {
+            int walletIndex = SendMessage(hWalletsList, LB_GETCURSEL, 0, 0);
+            if (walletIndex == LB_ERR || walletIndex >= g_wallets.size()) {
+                SetWindowText(hStatusLabel, L"Выберите кошелек!");
+                break;
+            }
+
+            wchar_t startDate[20], endDate[20];
+            GetWindowText(hStartDateEdit, startDate, 20);
+            GetWindowText(hEndDateEdit, endDate, 20);
+
+            std::wstring startDateStr = startDate;
+            std::wstring endDateStr = endDate;
+
+            if (startDateStr.empty() || endDateStr.empty()) {
+                SetWindowText(hStatusLabel, L"Заполните обе даты!");
+                break;
+            }
+
+            // Проверяем формат дат (простая проверка)
+            if (startDateStr.length() != 10 || endDateStr.length() != 10 ||
+                startDateStr[4] != '-' || startDateStr[7] != '-' ||
+                endDateStr[4] != '-' || endDateStr[7] != '-') {
+                SetWindowText(hStatusLabel, L"Неверный формат даты! Используйте гггг-мм-дд");
+                break;
+            }
+
+            const Wallet& wallet = g_wallets[walletIndex];
+
+            // Загружаем транзакции
+            std::vector<Transaction> allTransactions = LoadTransactions(wallet);
+            if (allTransactions.empty()) {
+                SetWindowText(hStatusLabel, L"Нет транзакций для выбранного кошелька!");
+                break;
+            }
+
+            // Фильтруем по дате
+            std::vector<Transaction> filteredTransactions =
+                FilterTransactionsByDate(allTransactions, startDateStr, endDateStr);
+
+            if (filteredTransactions.empty()) {
+                SetWindowText(hStatusLabel, L"Нет транзакций за выбранный период!");
+                break;
+            }
+
+            // Создаем окно отчета
+            CreateReportWindow(hWnd, wallet, filteredTransactions, startDateStr, endDateStr);
+            SetWindowText(hStatusLabel, L"Отчет создан!");
+        }
+        break;
+        }
+    }
+    break;
+
+    case WM_DESTROY:
+        break;
+
+    default:
+        return DefWindowProc(hWnd, uMsg, wParam, lParam);
+    }
+    return 0;
+}
+
+// Оконная процедура окна ОТЧЕТА (результат)
+LRESULT CALLBACK ReportViewWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    static HWND hReportContentList = NULL;
+
+    switch (uMsg) {
+    case WM_CREATE:
+    {
+        // Получаем данные отчета из параметра создания
+        CREATESTRUCT* createStruct = (CREATESTRUCT*)lParam;
+        ReportData* reportData = (ReportData*)createStruct->lpCreateParams;
+
+        if (!reportData) {
+            DestroyWindow(hWnd);
+            break;
+        }
+
+        // Заголовок отчета
+        std::wstring title = L"Отчет по кошельку: " + reportData->wallet.name +
+            L" за период " + reportData->startDate + L" - " + reportData->endDate;
+
+        CreateWindow(L"STATIC", title.c_str(),
+            WS_VISIBLE | WS_CHILD | SS_CENTER,
+            50, 20, 500, 30, hWnd, NULL, NULL, NULL);
+
+        // Содержимое отчета
+        hReportContentList = CreateWindow(L"LISTBOX", L"",
+            WS_VISIBLE | WS_CHILD | WS_BORDER | LBS_NOTIFY | WS_VSCROLL | WS_HSCROLL,
+            50, 60, 500, 400, hWnd, NULL, NULL, NULL);
+
+        // Кнопка закрытия
+        CreateWindow(L"BUTTON", L"Закрыть",
+            WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+            250, 470, 100, 30, hWnd,
+            (HMENU)800, NULL, NULL);
+
+        // Заполняем отчет
+        FillReportContent(hReportContentList, *reportData);
+
+        HFONT hFont = CreateFont(12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft Sans Serif");
+        if (hFont) {
+            HWND hChild = GetWindow(hWnd, GW_CHILD);
+            while (hChild) {
+                SendMessage(hChild, WM_SETFONT, (WPARAM)hFont, TRUE);
+                hChild = GetNextWindow(hChild, GW_HWNDNEXT);
+            }
+        }
+
+        // Очищаем данные отчета после использования
+        delete reportData;
+    }
+    break;
+
+    case WM_COMMAND:
+    {
+        int buttonId = LOWORD(wParam);
+        if (buttonId == 800) { // Закрыть
+            DestroyWindow(hWnd);
+        }
+    }
+    break;
+
+    case WM_DESTROY:
+        break;
+
+    default:
+        return DefWindowProc(hWnd, uMsg, wParam, lParam);
+    }
+    return 0;
+}
+
 // Оконная процедура окна УПРАВЛЕНИЯ ВАЛЮТНЫМИ ПАРАМИ (исправленная)
 LRESULT CALLBACK CurrencyPairsWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     static HWND hFromEdit = NULL;
@@ -1086,7 +1633,338 @@ LRESULT CALLBACK CurrencyPairsWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LP
     }
     return 0;
 }
+// Оконная процедура окна КОШЕЛЬКА (детальный вид)
+LRESULT CALLBACK WalletDetailWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    static HWND hWalletContentList = NULL;
+    static HWND hSellCurrencyEdit = NULL;
+    static HWND hBuyCurrencyEdit = NULL;
+    static HWND hAmountEdit = NULL;
+    static HWND hResultLabel = NULL;
+    static HWND hStatusLabel = NULL;
+    static HWND hExchangeRateLabel = NULL;
 
+    switch (uMsg) {
+    case WM_CREATE:
+    {
+        // Получаем индекс кошелька из параметра создания
+        CREATESTRUCT* createStruct = (CREATESTRUCT*)lParam;
+        g_currentWalletIndex = (int)createStruct->lpCreateParams;
+
+        if (g_currentWalletIndex < 0 || g_currentWalletIndex >= g_wallets.size()) {
+            MessageBox(hWnd, L"Ошибка: кошелек не найден", L"Ошибка", MB_OK);
+            DestroyWindow(hWnd);
+            break;
+        }
+
+        Wallet& wallet = g_wallets[g_currentWalletIndex];
+
+        // Заголовок с именем кошелька
+        CreateWindow(L"STATIC", (L"Кошелек: " + wallet.name).c_str(),
+            WS_VISIBLE | WS_CHILD | SS_CENTER,
+            50, 20, 300, 30, hWnd, NULL, NULL, NULL);
+
+        // Содержимое кошелька
+        CreateWindow(L"STATIC", L"Содержимое кошелька:",
+            WS_VISIBLE | WS_CHILD,
+            50, 60, 200, 20, hWnd, NULL, NULL, NULL);
+
+        hWalletContentList = CreateWindow(L"LISTBOX", L"",
+            WS_VISIBLE | WS_CHILD | WS_BORDER | LBS_NOTIFY | WS_VSCROLL,
+            50, 85, 300, 150, hWnd, NULL, NULL, NULL);
+
+        // Поля для обмена валют
+        CreateWindow(L"STATIC", L"Обмен валют:",
+            WS_VISIBLE | WS_CHILD,
+            50, 250, 200, 20, hWnd, NULL, NULL, NULL);
+
+        CreateWindow(L"STATIC", L"Продать валюту:",
+            WS_VISIBLE | WS_CHILD,
+            50, 280, 100, 20, hWnd, NULL, NULL, NULL);
+
+        hSellCurrencyEdit = CreateWindow(L"EDIT", L"",
+            WS_VISIBLE | WS_CHILD | WS_BORDER | ES_AUTOHSCROLL | ES_UPPERCASE,
+            160, 280, 80, 20, hWnd, NULL, NULL, NULL);
+
+        CreateWindow(L"STATIC", L"Купить валюту:",
+            WS_VISIBLE | WS_CHILD,
+            50, 310, 100, 20, hWnd, NULL, NULL, NULL);
+
+        hBuyCurrencyEdit = CreateWindow(L"EDIT", L"",
+            WS_VISIBLE | WS_CHILD | WS_BORDER | ES_AUTOHSCROLL | ES_UPPERCASE,
+            160, 310, 80, 20, hWnd, NULL, NULL, NULL);
+
+        CreateWindow(L"STATIC", L"Количество для продажи:",
+            WS_VISIBLE | WS_CHILD,
+            50, 340, 150, 20, hWnd, NULL, NULL, NULL);
+
+        hAmountEdit = CreateWindow(L"EDIT", L"",
+            WS_VISIBLE | WS_CHILD | WS_BORDER | ES_AUTOHSCROLL,
+            210, 340, 80, 20, hWnd, NULL, NULL, NULL);
+
+        // Поле для отображения курса и результата
+        hExchangeRateLabel = CreateWindow(L"STATIC", L"Курс: -",
+            WS_VISIBLE | WS_CHILD,
+            50, 370, 300, 20, hWnd, NULL, NULL, NULL);
+
+        hResultLabel = CreateWindow(L"STATIC", L"Вы получите: -",
+            WS_VISIBLE | WS_CHILD,
+            50, 390, 300, 20, hWnd, NULL, NULL, NULL);
+
+        // Кнопки
+        CreateWindow(L"BUTTON", L"Назад",
+            WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+            50, 420, 100, 30, hWnd,
+            (HMENU)600, NULL, NULL);
+
+        CreateWindow(L"BUTTON", L"Рассчитать",
+            WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+            160, 420, 100, 30, hWnd,
+            (HMENU)601, NULL, NULL);
+
+        CreateWindow(L"BUTTON", L"Купить",
+            WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+            270, 420, 100, 30, hWnd,
+            (HMENU)602, NULL, NULL);
+
+        hStatusLabel = CreateWindow(L"STATIC", L"Введите данные для обмена",
+            WS_VISIBLE | WS_CHILD | SS_CENTER,
+            50, 460, 300, 20, hWnd, NULL, NULL, NULL);
+
+        // Обновляем содержимое кошелька
+        UpdateWalletContentList(hWalletContentList, wallet);
+
+        HFONT hFont = CreateFont(12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            DEFAULT_QUALITY, DEFAULT_PITCH, L"Microsoft Sans Serif");
+        if (hFont) {
+            HWND hChild = GetWindow(hWnd, GW_CHILD);
+            while (hChild) {
+                SendMessage(hChild, WM_SETFONT, (WPARAM)hFont, TRUE);
+                hChild = GetNextWindow(hChild, GW_HWNDNEXT);
+            }
+        }
+    }
+    break;
+
+    case WM_COMMAND:
+    {
+        int buttonId = LOWORD(wParam);
+
+        if (g_currentWalletIndex < 0 || g_currentWalletIndex >= g_wallets.size()) {
+            SetWindowText(hStatusLabel, L"Ошибка: кошелек не найден");
+            break;
+        }
+
+        Wallet& wallet = g_wallets[g_currentWalletIndex];
+
+        switch (buttonId) {
+        case 600: // Назад
+            DestroyWindow(hWnd);
+            break;
+
+        case 601: // Рассчитать
+        {
+            wchar_t sellCurrency[10], buyCurrency[10], amount[20];
+            GetWindowText(hSellCurrencyEdit, sellCurrency, 10);
+            GetWindowText(hBuyCurrencyEdit, buyCurrency, 10);
+            GetWindowText(hAmountEdit, amount, 20);
+
+            std::wstring sellStr = sellCurrency;
+            std::wstring buyStr = buyCurrency;
+            std::wstring amountStr = amount;
+
+            if (sellStr.empty() || buyStr.empty() || amountStr.empty()) {
+                SetWindowText(hStatusLabel, L"Заполните все поля!");
+                break;
+            }
+
+            // Проверяем поддержку валют
+            if (!IsCurrencySupported(sellStr) || !IsCurrencySupported(buyStr)) {
+                SetWindowText(hStatusLabel, L"Одна из валют не поддерживается!");
+                break;
+            }
+
+            // Проверяем, есть ли такая валюта в кошельке
+            bool hasCurrency = false;
+            for (const auto& currency : wallet.currencies) {
+                if (currency.currency == sellStr) {
+                    hasCurrency = true;
+                    break;
+                }
+            }
+
+            if (!hasCurrency) {
+                SetWindowText(hStatusLabel, L"У вас нет такой валюты в кошельке!");
+                break;
+            }
+
+            try {
+                double amountValue = std::stod(amountStr);
+                if (amountValue <= 0) {
+                    SetWindowText(hStatusLabel, L"Количество должно быть больше 0!");
+                    break;
+                }
+
+                // Получаем курс обмена
+                double exchangeRate = GetCurrencyRate(sellStr, buyStr);
+                if (exchangeRate <= 0.0) {
+                    SetWindowText(hStatusLabel, L"Ошибка получения курса!");
+                    break;
+                }
+
+                // Рассчитываем результат
+                double result = amountValue * exchangeRate;
+
+                // Обновляем поля отображения
+                std::wstring rateText = L"Курс: 1 " + sellStr + L" = " +
+                    std::to_wstring(exchangeRate) + L" " + buyStr;
+                SetWindowText(hExchangeRateLabel, rateText.c_str());
+
+                std::wstring resultText = L"Вы получите: " + std::to_wstring(result) + L" " + buyStr;
+                SetWindowText(hResultLabel, resultText.c_str());
+
+                SetWindowText(hStatusLabel, L"Расчет завершен!");
+
+            }
+            catch (...) {
+                SetWindowText(hStatusLabel, L"Ошибка в количестве!");
+            }
+        }
+        break;
+
+        case 602: // Купить (совершить транзакцию)
+        {
+            wchar_t sellCurrency[10], buyCurrency[10], amount[20];
+            GetWindowText(hSellCurrencyEdit, sellCurrency, 10);
+            GetWindowText(hBuyCurrencyEdit, buyCurrency, 10);
+            GetWindowText(hAmountEdit, amount, 20);
+
+            std::wstring sellStr = sellCurrency;
+            std::wstring buyStr = buyCurrency;
+            std::wstring amountStr = amount;
+
+            if (sellStr.empty() || buyStr.empty() || amountStr.empty()) {
+                SetWindowText(hStatusLabel, L"Заполните все поля!");
+                break;
+            }
+
+            try {
+                double amountValue = std::stod(amountStr);
+                if (amountValue <= 0) {
+                    SetWindowText(hStatusLabel, L"Количество должно быть больше 0!");
+                    break;
+                }
+
+                // Проверяем, достаточно ли валюты для продажи
+                double availableAmount = 0.0;
+                int sellCurrencyIndex = -1;
+
+                for (size_t i = 0; i < wallet.currencies.size(); i++) {
+                    if (wallet.currencies[i].currency == sellStr) {
+                        availableAmount = wallet.currencies[i].amount;
+                        sellCurrencyIndex = i;
+                        break;
+                    }
+                }
+
+                if (sellCurrencyIndex == -1) {
+                    SetWindowText(hStatusLabel, L"У вас нет такой валюты в кошельке!");
+                    break;
+                }
+
+                if (availableAmount < amountValue) {
+                    SetWindowText(hStatusLabel, L"Недостаточно валюты для продажи!");
+                    break;
+                }
+
+                // Получаем курс обмена
+                double exchangeRate = GetCurrencyRate(sellStr, buyStr);
+                if (exchangeRate <= 0.0) {
+                    SetWindowText(hStatusLabel, L"Ошибка получения курса!");
+                    break;
+                }
+
+                // Рассчитываем количество покупаемой валюты
+                double boughtAmount = amountValue * exchangeRate;
+
+                // Сохраняем состояние кошелька до транзакции для истории
+                std::vector<WalletCurrency> walletStateBefore = GetWalletState(wallet);
+
+                // Выполняем транзакцию
+                // Уменьшаем количество продаваемой валюты
+                wallet.currencies[sellCurrencyIndex].amount -= amountValue;
+
+                // Если количество стало 0, удаляем валюту из кошелька
+                if (wallet.currencies[sellCurrencyIndex].amount <= 0) {
+                    wallet.currencies.erase(wallet.currencies.begin() + sellCurrencyIndex);
+                }
+
+                // Увеличиваем количество покупаемой валюты
+                bool currencyExists = false;
+                for (auto& currency : wallet.currencies) {
+                    if (currency.currency == buyStr) {
+                        currency.amount += boughtAmount;
+                        currencyExists = true;
+                        break;
+                    }
+                }
+
+                // Если валюты не было, добавляем новую
+                if (!currencyExists) {
+                    WalletCurrency newCurrency;
+                    newCurrency.currency = buyStr;
+                    newCurrency.amount = boughtAmount;
+                    wallet.currencies.push_back(newCurrency);
+                }
+
+                // Сохраняем кошелек
+                SaveWallets();
+
+                // Создаем запись о транзакции
+                Transaction transaction;
+                transaction.date = GetCurrentDateTime();
+                transaction.soldCurrency = sellStr;
+                transaction.soldAmount = amountValue;
+                transaction.boughtCurrency = buyStr;
+                transaction.boughtAmount = boughtAmount;
+                transaction.exchangeRate = exchangeRate;
+                transaction.walletState = GetWalletState(wallet); // Состояние после транзакции
+
+                SaveTransaction(wallet, transaction);
+
+                // Обновляем интерфейс
+                UpdateWalletContentList(hWalletContentList, wallet);
+
+                std::wstring successMsg = L"Транзакция завершена! Куплено: " +
+                    std::to_wstring(boughtAmount) + L" " + buyStr;
+                SetWindowText(hStatusLabel, successMsg.c_str());
+
+                // Очищаем поля ввода
+                SetWindowText(hSellCurrencyEdit, L"");
+                SetWindowText(hBuyCurrencyEdit, L"");
+                SetWindowText(hAmountEdit, L"");
+                SetWindowText(hExchangeRateLabel, L"Курс: -");
+                SetWindowText(hResultLabel, L"Вы получите: -");
+
+            }
+            catch (...) {
+                SetWindowText(hStatusLabel, L"Ошибка при выполнении транзакции!");
+            }
+        }
+        break;
+        }
+    }
+    break;
+
+    case WM_DESTROY:
+        g_currentWalletIndex = -1; // Сбрасываем индекс при закрытии окна
+        break;
+
+    default:
+        return DefWindowProc(hWnd, uMsg, wParam, lParam);
+    }
+    return 0;
+}
 // Оконная процедура окна КОШЕЛЬКОВ
 LRESULT CALLBACK WalletsWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     static HWND hWalletsList = NULL;
@@ -1270,27 +2148,30 @@ LRESULT CALLBACK WalletsWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
         }
         break;
 
+        // В WalletsWindowProc в обработке кнопки "Открыть":
         case 505: // Открыть кошелек
         {
             int index = SendMessage(hWalletsList, LB_GETCURSEL, 0, 0);
             if (index != LB_ERR && index < g_wallets.size()) {
-                // Пока заглушка - функционал будет добавлен позже
-                const auto& wallet = g_wallets[index];
-                std::wstring message = L"Открытие кошелька: " + wallet.name + L"\n\n";
-                message += L"Содержимое кошелька:\n";
+                // Создаем окно детального просмотра кошелька
+                HWND hWalletDetailWindow = CreateWindow(
+                    L"WalletDetailWindowClass",
+                    L"Детали кошелька",
+                    WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+                    CW_USEDEFAULT, CW_USEDEFAULT, 450, 550,
+                    hWnd, NULL, g_hInstance, (LPVOID)index // Передаем индекс кошелька
+                );
 
-                for (const auto& currency : wallet.currencies) {
-                    message += L"• " + currency.currency + L": " +
-                        std::to_wstring(currency.amount) + L"\n";
+                if (hWalletDetailWindow) {
+                    ShowWindow(hWalletDetailWindow, SW_SHOW);
+                    UpdateWindow(hWalletDetailWindow);
                 }
-
-                MessageBox(hWnd, message.c_str(), L"Информация о кошельке", MB_OK);
-                SetWindowText(hStatusLabel, (L"Открыт кошелек: " + wallet.name).c_str());
             }
             else {
                 SetWindowText(hStatusLabel, L"Выберите кошелек для открытия!");
             }
         }
+        break;
         break;
 
         case 506: // Удалить кошелек
@@ -1636,8 +2517,17 @@ LRESULT CALLBACK MainMenuWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
         break;
 
         case 203: // Создать отчет
-            MessageBox(hWnd, L"Функция 'Создать отчет' будет реализована позже", L"Информация", MB_OK);
-            break;
+        {
+            HWND hReportsWindow = CreateWindow(
+                L"ReportsWindowClass",
+                L"Окно отчетов",
+                WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+                CW_USEDEFAULT, CW_USEDEFAULT, 400, 450,
+                hWnd, NULL, g_hInstance, NULL
+            );
+            ShowWindow(hReportsWindow, SW_SHOW);
+        }
+        break;
 
         case 204: // Обновить курсы
             UpdateCurrencyRates(hCurrencyList);
@@ -1671,7 +2561,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         !RegisterWindowClass(L"MainMenuClass", MainMenuWindowProc) ||
         !RegisterWindowClass(L"CurrencyPairsClass", CurrencyPairsWindowProc) ||
         !RegisterWindowClass(L"NotificationsWindowClass", NotificationsWindowProc) ||
-        !RegisterWindowClass(L"WalletsWindowClass", WalletsWindowProc)
+        !RegisterWindowClass(L"WalletsWindowClass", WalletsWindowProc) ||
+        !RegisterWindowClass(L"WalletDetailWindowClass", WalletDetailWindowProc) ||
+        !RegisterWindowClass(L"ReportViewWindowClass", ReportViewWindowProc)
         ) {
         MessageBox(NULL, L"Ошибка регистрации классов окон", L"Ошибка", MB_ICONERROR);
         return 0;
